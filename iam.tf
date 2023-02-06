@@ -1,99 +1,104 @@
 locals {
-  irsa_role_create = var.enabled && var.rbac_create && var.service_account_create && var.irsa_role_create
+  aws_backup_managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup",
+    "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
+  ]
+  role_description = "Provides AWS Backup permission to create backups and perform restores on your behalf across AWS services"
 }
 
-data "aws_iam_policy_document" "this" {
-  count = local.irsa_role_create && var.irsa_policy_enabled && !var.irsa_assume_role_enabled ? 1 : 0
-
-  # Example statement (modify it before using this module)
-  statement {
-    sid = "Autoscaling"
-
-    actions = [
-      "autoscaling:DescribeAutoScalingGroups",
-      "autoscaling:DescribeAutoScalingInstances",
-      "autoscaling:DescribeLaunchConfigurations",
-      "autoscaling:DescribeTags",
-      "autoscaling:SetDesiredCapacity",
-      "autoscaling:TerminateInstanceInAutoScalingGroup",
-      "ec2:DescribeLaunchTemplateVersions",
-      "ec2:DescribeInstanceTypes"
-    ] # checkov:skip=CKV_AWS_111
-
-    resources = [
-      "*",
-    ]
-
-    effect = "Allow"
+module "source_role" {
+  source  = "cloudposse/iam-role/aws"
+  version = "0.17.0"
+  providers = {
+    aws = aws.source
   }
-}
 
-data "aws_iam_policy_document" "this_assume" {
-  count = local.irsa_role_create && var.irsa_assume_role_enabled ? 1 : 0
+  name = "${module.label.id}-source"
 
-  statement {
-    sid    = "AllowAssume<$addon-name>Role"
-    effect = "Allow"
-    actions = [
-      "sts:AssumeRole"
-    ]
-    resources = [
-      var.irsa_assume_role_arn
-    ]
+  role_description = local.role_description
+
+  assume_role_actions = [
+    "sts:AssumeRole"
+  ]
+
+  principals = {
+    Service = ["backup.amazonaws.com"]
   }
+
+  managed_policy_arns = local.aws_backup_managed_policy_arns
+
+  policy_document_count = 0
 }
 
-resource "aws_iam_policy" "this" {
-  count = local.irsa_role_create && (var.irsa_policy_enabled || var.irsa_assume_role_enabled) ? 1 : 0
 
-  name        = "${var.irsa_role_name_prefix}-${var.helm_chart_name}"
-  path        = "/"
-  description = "Policy for <$addon-name> service"
-  policy      = var.irsa_assume_role_enabled ? data.aws_iam_policy_document.this_assume[0].json : data.aws_iam_policy_document.this[0].json
+module "target_role" {
+  source  = "cloudposse/iam-role/aws"
+  version = "0.17.0"
 
-  tags = var.irsa_tags
+  enabled = var.is_cross_acount_backup_enabled
+
+  providers = {
+    aws = aws.target
+  }
+
+  name = "${module.label.id}-target"
+
+  role_description = local.role_description
+
+  assume_role_actions = [
+    "sts:AssumeRole"
+  ]
+
+  principals = {
+    Service = ["backup.amazonaws.com"]
+  }
+
+  policy_document_count = 0
+
+  managed_policy_arns = local.aws_backup_managed_policy_arns
 }
 
-data "aws_iam_policy_document" "this_irsa" {
-  count = local.irsa_role_create ? 1 : 0
 
+# aws backup
+
+data "aws_iam_policy_document" "source_vault" {
+  provider = aws.source
   statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    sid    = "Enable backup"
+    effect = "Allow"
+
+    actions = ["backup:CopyIntoBackupVault"]
+
+    #checkov:skip=CKV_AWS_109
+    resources = ["*"]
 
     principals {
-      type        = "Federated"
-      identifiers = [var.cluster_identity_oidc_issuer_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(var.cluster_identity_oidc_issuer, "https://", "")}:sub"
-
-      values = [
-        "system:serviceaccount:${var.namespace}:${var.service_account_name}",
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.target.account_id}:root",
       ]
+      type = "AWS"
     }
-
-    effect = "Allow"
   }
 }
 
-resource "aws_iam_role" "this" {
-  count              = local.irsa_role_create ? 1 : 0
-  name               = "${var.irsa_role_name_prefix}-${var.helm_chart_name}"
-  assume_role_policy = data.aws_iam_policy_document.this_irsa[0].json
-  tags               = var.irsa_tags
-}
+data "aws_iam_policy_document" "target_vault" {
+  count = var.is_cross_acount_backup_enabled ? 1 : 0
 
-resource "aws_iam_role_policy_attachment" "this" {
-  count      = local.irsa_role_create && var.irsa_policy_enabled ? 1 : 0
-  role       = aws_iam_role.this[0].name
-  policy_arn = aws_iam_policy.this[0].arn
-}
+  provider = aws.target
+  statement {
+    sid    = "Enable backup"
+    effect = "Allow"
 
-resource "aws_iam_role_policy_attachment" "this_additional" {
-  for_each = local.irsa_role_create ? var.irsa_additional_policies : {}
+    actions = ["backup:CopyIntoBackupVault"]
 
-  role       = aws_iam_role.this[0].name
-  policy_arn = each.value
+    #checkov:skip=CKV_AWS_109
+    resources = ["*"]
+
+    principals {
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.source.account_id}:root",
+      ]
+      type = "AWS"
+    }
+  }
 }

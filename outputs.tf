@@ -1,19 +1,19 @@
-output "helm_release_metadata" {
-  description = "Helm release attributes"
-  value       = try(helm_release.this[0].metadata, {})
+output "source_backup_vault_id" {
+  value       = aws_backup_vault.source.id
+  description = "Backup Vault ID of source backup vault"
 }
 
-output "helm_release_application_metadata" {
-  description = "Argo application helm release attributes"
-  value       = try(helm_release.argo_application[0].metadata, {})
+output "source_backup_vault_arn" {
+  value       = aws_backup_vault.source.arn
+  description = "Backup Vault ARN of source backup vault"
 }
 
-output "kubernetes_application_attributes" {
-  description = "Argo kubernetes manifest attributes"
-  value       = try(kubernetes_manifest.this[0], {})
+output "target_backup_vault_id" {
+  value       = aws_backup_vault.target.*.id
+  description = "Backup Vault ID of target backup vault"
 }
 
-output "iam_role_attributes" {
-  description = "<$addon-name> IAM role atributes"
-  value       = try(aws_iam_role.this[0], {})
+output "target_backup_vault_arn" {
+  value       = aws_backup_vault.target.*.arn
+  description = "Backup Vault ARN of target backup vault"
 }

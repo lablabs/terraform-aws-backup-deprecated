@@ -1,25 +1,17 @@
 provider "aws" {
-  region = "eu-central-1"
+  alias   = "management"
+  region  = "eu-central-1"
+  profile = "management"
 }
 
-data "aws_eks_cluster" "this" {
-  name = module.eks_cluster.eks_cluster_id
+provider "aws" {
+  alias   = "source"
+  region  = "eu-central-1"
+  profile = "dev"
 }
 
-data "aws_eks_cluster_auth" "this" {
-  name = module.eks_cluster.eks_cluster_id
-}
-
-provider "kubernetes" {
-  host                   = data.aws_eks_cluster.this.endpoint
-  token                  = data.aws_eks_cluster_auth.this.token
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = data.aws_eks_cluster.this.endpoint
-    token                  = data.aws_eks_cluster_auth.this.token
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
-  }
+provider "aws" {
+  alias   = "target"
+  region  = "eu-central-1"
+  profile = "audit"
 }
