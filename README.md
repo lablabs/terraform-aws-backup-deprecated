@@ -1,4 +1,4 @@
-# AWS EKS <$addon-name> Terraform module
+# AWS Backup Terraform module
 
 [<img src="https://lablabs.io/static/ll-logo.png" width=350px>](https://lablabs.io/)
 
@@ -11,37 +11,13 @@ We help companies build, run, deploy and scale software and infrastructure by em
 
 ## Description
 
-A Terraform module to deploy the <$addon-name> on Amazon EKS cluster.
+A Terraform module to provision AWS Backup 
 
 ## Related Projects
 
 Check out other [terraform kubernetes addons](https://github.com/orgs/lablabs/repositories?q=terraform-aws-eks&type=public&language=&sort=).
 
 ## Deployment methods
-
-### Helm
-Deploy Helm chart via Helm resource (default method, set `enabled = true`)
-
-### Argo Kubernetes
-Deploy Helm chart as ArgoCD Application via Kubernetes manifest resource (set `enabled = true` and `argo_enabled = true`)
-
-> **Warning**
->
-> When deploying with ArgoCD application, Kubernetes terraform provider requires access to Kubernetes cluster API during plan time. This introduces potential issue when you want to deploy the cluster with this addon at the same time, during the same Terraform run.
->
-> To overcome this issue, the module deploys the ArgoCD application object using the Helm provider, which does not require API access during plan. If you want to deploy the application using this workaround, you can set the `argo_helm_enabled` variable to `true`.
-
-### Argo Helm
-Deploy Helm chart as ArgoCD Application via Helm resource (set `enabled = true`, `argo_enabled = true` and `argo_helm_enabled = true`)
-
-<!-- Uncomment paragraph bellow if addon contains IAM resources
-## AWS IAM resources
-
-To disable of creation IRSA role and IRSA policy, set `irsa_role_create = false` and `irsa_policy_enabled = false`, respectively -->
-
-<!-- Uncomment paragraph bellow if addon uses Role assuming
-### Role assuming
-To assume role set `irsa_assume_role_enabled = true` and specify `irsa_assume_role_arn` variable -->
 
 ## Examples
 
